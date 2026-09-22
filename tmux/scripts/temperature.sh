@@ -4,17 +4,45 @@ set -euo pipefail
 cpu_temp=""
 gpu_usage=""
 metrics_cache="${TMPDIR:-/tmp}/tmux-macmon-metrics-$(id -u)"
+metrics_cache_max_age=15
+metrics_display_max_age=60
+now_epoch="$(date +%s)"
+cached_cpu_temp=""
+cached_gpu_usage=""
+cached_gpu_display=""
 
-if [[ "${1:-}" == "--gpu" ]]; then
-  if [[ -r "$metrics_cache" ]]; then
-    IFS=, read -r sampled_at _ cached_gpu <"$metrics_cache"
-    if [[ "$sampled_at" =~ ^[0-9]+$ && "$cached_gpu" =~ ^[0-9]+([.][0-9]+)?$ ]] &&
-       (( $(date +%s) - sampled_at <= 15 )); then
-      awk -v value="$cached_gpu" 'BEGIN { printf "%.0f%%\n", value }'
-      exit 0
+if [[ -r "$metrics_cache" ]]; then
+  IFS=, read -r sampled_at cached_cpu_temp cached_gpu_usage <"$metrics_cache"
+  if [[ ! "$sampled_at" =~ ^[0-9]+$ ||
+        ! "$cached_cpu_temp" =~ ^[0-9]+([.][0-9]+)?$ ||
+        ! "$cached_gpu_usage" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    cached_cpu_temp=""
+    cached_gpu_usage=""
+  else
+    cache_age=$((now_epoch - sampled_at))
+    if (( cache_age >= 0 && cache_age <= metrics_display_max_age )); then
+      cached_gpu_display="$cached_gpu_usage"
+    fi
+    if (( cache_age < 0 || cache_age > metrics_cache_max_age )); then
+      cached_cpu_temp=""
+      cached_gpu_usage=""
     fi
   fi
-  printf "--\n"
+fi
+
+if [[ "${1:-}" == "--gpu" ]]; then
+  if [[ -n "$cached_gpu_display" ]]; then
+    awk -v value="$cached_gpu_display" 'BEGIN { printf "%.0f%%\n", value }'
+    exit 0
+  fi
+  printf '%s\n' '--%'
+  exit 0
+fi
+
+if [[ -n "$cached_cpu_temp" ]]; then
+  awk -v c="$cached_cpu_temp" 'BEGIN {
+    if (c > 0) printf "%.1f°F\n", (c * 9 / 5) + 32
+  }'
   exit 0
 fi
 
@@ -50,7 +78,10 @@ if command -v macmon >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
       gpu_usage="$(awk -v value="$macmon_gpu_usage" 'BEGIN { printf "GPU %.0f%%", value }')"
     fi
     if [[ -n "$cpu_temp" && "$macmon_gpu_usage" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-      printf '%s,%s,%s\n' "$(date +%s)" "$macmon_temp" "$macmon_gpu_usage" >"$metrics_cache"
+      if cache_tmp="$(mktemp "${metrics_cache}.tmp.XXXXXX" 2>/dev/null)"; then
+        printf '%s,%s,%s\n' "$now_epoch" "$macmon_temp" "$macmon_gpu_usage" >"$cache_tmp"
+        mv -f "$cache_tmp" "$metrics_cache"
+      fi
     fi
   fi
 fi
