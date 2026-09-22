@@ -9,6 +9,7 @@ metrics_display_max_age=60
 now_epoch="$(date +%s)"
 cached_cpu_temp=""
 cached_gpu_usage=""
+cached_cpu_display=""
 cached_gpu_display=""
 
 if [[ -r "$metrics_cache" ]]; then
@@ -21,6 +22,7 @@ if [[ -r "$metrics_cache" ]]; then
   else
     cache_age=$((now_epoch - sampled_at))
     if (( cache_age >= 0 && cache_age <= metrics_display_max_age )); then
+      cached_cpu_display="$cached_cpu_temp"
       cached_gpu_display="$cached_gpu_usage"
     fi
     if (( cache_age < 0 || cache_age > metrics_cache_max_age )); then
@@ -99,6 +101,13 @@ fi
 
 if [[ -n "$cpu_temp" ]]; then
   printf "%s\n" "$cpu_temp"
+  exit 0
+fi
+
+if [[ -n "$cached_cpu_display" ]]; then
+  awk -v c="$cached_cpu_display" 'BEGIN {
+    if (c > 0) printf "%.1f°F\n", (c * 9 / 5) + 32
+  }'
   exit 0
 fi
 
