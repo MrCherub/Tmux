@@ -1,7 +1,7 @@
 # Tmux
 A productivity-focused tmux setup with Catppuccin styling, Nord accents, Vim pane navigation, and CPU/session/uptime/temperature status modules.
 
-<img width="1307" height="24" alt="Screenshot 2026-03-06 at 3 45 30 AM" src="https://github.com/user-attachments/assets/e319870a-4d9b-490e-95d5-ccffe5777f44" />
+<img width="1555" height="25" alt="Screenshot 2026-09-23 at 6 38 52 AM" src="https://github.com/user-attachments/assets/e3a684fc-62e2-49ac-8444-4b272ce119e9" />
 
 
 ## File Layout
